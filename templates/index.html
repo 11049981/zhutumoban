@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>图片处理工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-form {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .submit-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+        #loading {
+            display: none;
+            margin-top: 10px;
+        }
+        .download-link {
+            color: #4CAF50;
+            text-decoration: none;
+            padding: 5px 10px;
+            border: 1px solid #4CAF50;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .download-link:hover {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .preview-container {
+            margin-top: 10px;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .preview-image {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+        }
+        .result-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>图片处理工具</h1>
+    <div class="upload-form">
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="psd_file">选择PSD文件 (可多选):</label>
+                <input type="file" id="psd_file" name="psd_file" accept=".psd" multiple required>
+            </div>
+            
+            <div class="form-group">
+                <label for="template_file">选择模板图片:</label>
+                <input type="file" id="template_file" name="template_file" accept="image/*" required>
+            </div>
+            
+            <button type="submit" class="submit-btn">处理图片</button>
+        </form>
+        <div id="loading">处理中，请稍候...</div>
+    </div>
+
+    <div id="results" style="margin-top: 20px; display: none;">
+        <h3>处理结果:</h3>
+        <div id="result-list"></div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = function(e) {
+            e.preventDefault();
+            
+            document.getElementById('loading').style.display = 'block';
+            const resultList = document.getElementById('result-list');
+            resultList.innerHTML = '';
+            document.getElementById('results').style.display = 'none';
+            
+            const formData = new FormData();
+            const psdFiles = document.getElementById('psd_file').files;
+            const templateFile = document.getElementById('template_file').files[0];
+            
+            formData.append('template_file', templateFile);
+            
+            for(let i = 0; i < psdFiles.length; i++) {
+                formData.append('psd_files', psdFiles[i]);
+            }
+            
+            fetch('http://127.0.0.1:5000/process', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text || '处理失败');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('results').style.display = 'block';
+                
+                if (data.error) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.textContent = `处理失败: ${data.error}`;
+                    errorDiv.style.color = 'red';
+                    resultList.appendChild(errorDiv);
+                    return;
+                }
+                
+                data.results.forEach(result => {
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'result-item';
+                    
+                    if(result.success) {
+                        // 添加文件名
+                        const titleDiv = document.createElement('div');
+                        titleDiv.textContent = `文件: ${result.filename}`;
+                        titleDiv.style.fontWeight = 'bold';
+                        resultDiv.appendChild(titleDiv);
+                        
+                        // 添加预览图
+                        const previewContainer = document.createElement('div');
+                        previewContainer.className = 'preview-container';
+                        
+                        const previewImage = document.createElement('img');
+                        previewImage.src = result.preview_data;
+                        previewImage.className = 'preview-image';
+                        previewImage.alt = `${result.filename} 预览`;
+                        
+                        previewContainer.appendChild(previewImage);
+                        resultDiv.appendChild(previewContainer);
+                        
+                        // 添加保存位置信息
+                        const pathDiv = document.createElement('div');
+                        pathDiv.textContent = `已保存到: ${result.output_path}`;
+                        pathDiv.style.marginTop = '10px';
+                        pathDiv.style.color = '#666';
+                        resultDiv.appendChild(pathDiv);
+                        
+                    } else {
+                        resultDiv.textContent = `${result.filename} 处理失败: ${result.error}`;
+                        resultDiv.style.color = 'red';
+                    }
+                    
+                    resultList.appendChild(resultDiv);
+                });
+                
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                alert('错误: ' + error.message);
+                document.getElementById('loading').style.display = 'none';
+            });
+        };
+    </script>
+</body>
+</html> 
