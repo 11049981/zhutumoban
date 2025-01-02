@@ -43,27 +43,31 @@ def process():
         temp_dir = tempfile.mkdtemp()
         
         # 保存模板文件
-        template_path = os.path.join(temp_dir, secure_filename(template_file.filename))
+        template_filename = secure_filename(template_file.filename)
+        template_path = os.path.join(temp_dir, template_filename)
         template_file.save(template_path)
         
         # 处理每个PSD文件
         for psd_file in psd_files:
             try:
-                # 获取原始文件名和目录
-                filename = secure_filename(psd_file.filename)
-                file_dir = os.path.dirname(os.path.abspath(filename))
+                # 获取原始文件名（不包含路径）
+                original_filename = os.path.basename(psd_file.filename)
+                base_name = os.path.splitext(original_filename)[0]
                 
-                # 设置临时和输出路径
-                temp_psd_path = os.path.join(temp_dir, filename)
-                output_filename = f'processed_{os.path.splitext(filename)[0]}.png'
+                # 创建输出文件名
+                output_filename = f'processed_{base_name}.jpg'
                 
-                # 如果目录不存在，使用当前目录
-                if not file_dir or file_dir == '.':
-                    file_dir = os.getcwd()
-                    
-                output_path = os.path.join(file_dir, output_filename)
+                # 在当前目录创建output文件夹
+                output_dir = os.path.join(os.getcwd(), 'output')
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
                 
-                # 保存上传的PSD文件
+                # 设置输出路径
+                output_path = os.path.join(output_dir, output_filename)
+                output_path = os.path.normpath(output_path)  # 规范化路径
+                
+                # 保存上传的PSD文件到临时目录
+                temp_psd_path = os.path.join(temp_dir, secure_filename(original_filename))
                 psd_file.save(temp_psd_path)
                 
                 # 处理图片
@@ -75,16 +79,16 @@ def process():
                 
                 # 添加成功结果
                 results.append({
-                    'filename': filename,
+                    'filename': original_filename,
                     'success': True,
                     'output_path': output_path,
                     'preview_data': f'data:image/png;base64,{img_data}'
                 })
                 
             except Exception as e:
-                print(f"处理文件 {filename} 时出错: {str(e)}")  # 添加错误日志
+                print(f"处理文件 {original_filename} 时出错: {str(e)}")
                 results.append({
-                    'filename': filename,
+                    'filename': original_filename,
                     'success': False,
                     'error': str(e)
                 })
@@ -97,7 +101,7 @@ def process():
         return jsonify({'results': results})
         
     except Exception as e:
-        print(f"处理请求时出错: {str(e)}")  # 添加错误日志
+        print(f"处理请求时出错: {str(e)}")
         return jsonify({'error': str(e)}), 500
         
     finally:
